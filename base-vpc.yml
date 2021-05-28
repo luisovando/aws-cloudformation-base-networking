@@ -16,7 +16,9 @@ Metadata:
   
 Mappings:
   
-Conditions:
+Conditions: # Conditions are boolean (true/false) expressions that we will use elsewhere in the template.
+  BuildPublicB: !Not [ !Equals [ !Ref NumberOfAZs, 1 ] ] # If NumberOfAZs selected value is equals to 1 then negating the result.
+  BuildPublicC: !Equals [ !Ref NumberOfAZs, 3 ]
   
 Resources:
   VPC:
@@ -55,6 +57,7 @@ Resources:
           Value: value
   PublicSubnetB:
     Type: AWS::EC2::Subnet
+    Condition: BuildPublicB
     DependsOn: VPC
     Properties:
       AvailabilityZone: !Select
@@ -62,6 +65,18 @@ Resources:
         - Fn::GetAZs: !Ref 'AWS::Region'
       VpcId: !Ref VPC
       CidrBlock: 10.1.20.0/24
+      Tags:
+        - Key: keyname
+          Value: value
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Condition: BuildPublicC
+    Properties:
+      AvailabilityZone: !Select
+        - 2
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.30.0/24
       Tags:
         - Key: keyname
           Value: value
@@ -139,9 +154,16 @@ Resources:
       SubnetId: !Ref PublicSubnetA
   PublicSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: BuildPublicB
     Properties:
       RouteTableId: !Ref PublicRouteTable
       SubnetId: !Ref PublicSubnetB
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: BuildPublicC
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetC
   PrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
