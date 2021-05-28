@@ -3,6 +3,14 @@ AWSTemplateFormatVersion: 2010-09-09
 Description:
   
 Parameters:
+  NumberOfAZs:
+    AllowedValues:
+    - 1
+    - 2
+    - 3
+    Description: How many Availability Zones do you wish to utilize?
+    Type: Number
+    Default: 2
   
 Metadata:
   
