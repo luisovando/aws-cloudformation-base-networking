@@ -11,6 +11,13 @@ Parameters:
     Description: How many Availability Zones do you wish to utilize?
     Type: Number
     Default: 2
+  PrivateSubnets:
+    AllowedValues:
+    - True
+    - False
+    Description: Do you want to create private subnets in addition to public subnets?
+    Type: String
+    Default: True
   
 Metadata:
   
@@ -19,7 +26,11 @@ Mappings:
 Conditions: # Conditions are boolean (true/false) expressions that we will use elsewhere in the template.
   BuildPublicB: !Not [ !Equals [ !Ref NumberOfAZs, 1 ] ] # If NumberOfAZs selected value is equals to 1 then negating the result.
   BuildPublicC: !Equals [ !Ref NumberOfAZs, 3 ]
-  
+  BuildPrivateSubnets: !Equals [ !Ref PrivateSubnets, True ]
+  BuildPrivateA: !Equals [ !Ref PrivateSubnets, True ]
+  BuildPrivateB: !And [ !Not [ !Equals [ !Ref NumberOfAZs, 1 ] ], !Equals [!Ref PrivateSubnets, True] ]
+  BuildPrivateC: !And [ !Equals [ !Ref NumberOfAZs, 3 ] , !Equals [ !Ref PrivateSubnets, True ] ]
+
 Resources:
   VPC:
     Type: AWS::EC2::VPC
@@ -82,6 +93,7 @@ Resources:
           Value: value
   PrivateSubnetA:
     Type: AWS::EC2::Subnet
+    Condition: BuildPrivateA
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.50.0/24
@@ -89,10 +101,11 @@ Resources:
         - 0
         - Fn::GetAZs: !Ref 'AWS::Region'
       Tags:
-      - Key: Name
-        Value: !Sub ${AWS::StackName}-Private-A
+      - Key: keyname
+        Value: value
   PrivateSubnetB:
     Type: AWS::EC2::Subnet
+    Condition: BuildPrivateB
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.1.60.0/24
@@ -100,8 +113,20 @@ Resources:
         - 1
         - Fn::GetAZs: !Ref 'AWS::Region'
       Tags:
-      - Key: Name
-        Value: !Sub ${AWS::StackName}-Private-B  
+      - Key: keyname
+        Value: value  
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Condition: BuildPrivateC
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.1.70.0/24
+      AvailabilityZone: !Select
+        - 2
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      Tags:
+      - Key: keyname
+        Value: value 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     DependsOn: VPC
@@ -166,14 +191,22 @@ Resources:
       SubnetId: !Ref PublicSubnetC
   PrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: BuildPrivateA
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnetA
   PrivateSubnetBRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: BuildPrivateB
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnetB
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: BuildPrivateC
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetC
 Transform:
   
 Outputs:
