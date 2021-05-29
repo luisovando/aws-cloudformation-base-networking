@@ -29,6 +29,38 @@ Parameters:
 Metadata:
   
 Mappings:
+  #  This is the Amazon Linux 2 AMI.  Adjust these values as needed, they can change a few times per year:
+  RegionMap:
+    us-east-1:
+      AMI: ami-04681a1dbd79675a5    # N Virginia
+      Shortcode: 'ue1'
+    us-east-2:
+      AMI: ami-0cf31d971a3ca20d6    # Ohio     
+      Shortcode: 'ue2'
+    us-west-1:
+      AMI: ami-0782017a917e973e7    # N California
+      Shortcode: 'uw1'
+    us-west-2:
+      AMI: ami-6cd6f714             # Oregon
+      Shortcode: 'uw2'
+    eu-west-1:
+      AMI: ami-0bdb1d6c15a40392c    # Ireland
+      Shortcode: 'ew1'
+    eu-central-1:
+      AMI: ami-0f5dbc86dd9cbf7a8    # Frankfurt
+      Shortcode: 'ec1'
+    sa-east-1:
+      AMI: ami-0ad7b0031d41ed4b9    # Sao Paulo
+      Shortcode: 'se1'
+    ap-southeast-1:
+      AMI: ami-01da99628f381e50a    # Singapore
+      Shortcode: 'ase1'
+    ap-southeast-2:
+      AMI: ami-00e17d1165b9dd3ec    # Sydney
+      Shortcode: 'ase2'
+    ap-northeast-1:
+      AMI: ami-08847abae18baa040    # Tokyo
+      Shortcode: 'ane1'
   
 Conditions: # Conditions are boolean (true/false) expressions that we will use elsewhere in the template.
   BuildPublicB: !Not [ !Equals [ !Ref NumberOfAZs, 1 ] ] # If NumberOfAZs selected value is equals to 1 then negating the result.
@@ -166,8 +198,10 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       DestinationCidrBlock: 0.0.0.0/0
+      # Route traffic through the NAT Instance:
+      InstanceId: !If [BuildNATInstance, !Ref NATInstance, !Ref "AWS::NoValue"]
       # Route traffic through the NAT Gateway:
-      NatGatewayId: !Ref NATGateway
+      NatGatewayId: !If [BuildNATGateway, !Ref NATGateway, !Ref "AWS::NoValue"] 
   # A NAT Gateway will be built and used if the user selected Private subnets and a Gateway instead of an EC2 instance. 
   NATGateway:
     Type: AWS::EC2::NatGateway
@@ -223,6 +257,73 @@ Resources:
     Properties:
       RouteTableId: !Ref PrivateRouteTable
       SubnetId: !Ref PrivateSubnetC
+  NATSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: BuildNATInstance
+    DependsOn: AttachGateway
+    Properties:
+      GroupName: !Join [ 
+        '-', [ 
+          'sg',
+          !FindInMap [ RegionMap, !Ref AWS::Region, 'Shortcode' ],
+          'nat'
+        ] 
+      ]
+      GroupDescription: Enable internal access to the NAT device
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 1024
+          CidrIp: !GetAtt VPC.CidrBlock
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0 
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: udp
+          FromPort: 0 
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key:
+          Value:
+  # A NAT Instance will be used if the user selected Private subnets and EC2-based NAT.     
+  NATInstance:
+    Type: AWS::EC2::Instance
+    Condition: BuildNATInstance
+    DependsOn: PublicRoute1 # Must have route to IGW established.
+    Properties:
+      ImageId: !FindInMap [ RegionMap, !Ref "AWS::Region", AMI]  # lookup from AMI map
+      InstanceType: t2.small
+      NetworkInterfaces:
+        - DeviceIndex: 0
+          SubnetId: !Ref PublicSubnetA  # Any public subnet is fine
+          AssociatePublicIpAddress: true # We will need a public IP address
+          GroupSet: [ !Ref NATSecurityGroup ]  # Plug in the security group
+      SourceDestCheck: false  # NATs don't work if EC2 matches source with destinations.
+      UserData:      #  This code is NAT code.  Last line signals completion:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum -y update
+          yum install -y aws-cfn-bootstrap
+          echo 1 > /proc/sys/net/ipv4/ip_forward
+          echo 0 > /proc/sys/net/ipv4/conf/eth0/send_redirects
+          /sbin/iptables -t nat -A POSTROUTING -o eth0 -s 0.0.0.0/0 -j MASQUERADE
+          /sbin/iptables-save > /etc/sysconfig/iptables
+          mkdir -p /etc/sysctl.d/
+          cat << NatConfFileMarker > /etc/sysctl.d/nat.conf
+          net.ipv4.ip_forward = 1
+          net.ipv4.conf.eth0.send_redirects = 0
+          NatConfFileMarker
+          /opt/aws/bin/cfn-signal -e 0 --resource NATInstance --stack ${AWS::StackName} --region ${AWS::Region}
+      Tags:
+        - Key: key
+          Value: value
+    CreationPolicy:
+      ResourceSignal: 
+        Count: 1
+        Timeout: PT5M      
 Transform:
   
 Outputs:
