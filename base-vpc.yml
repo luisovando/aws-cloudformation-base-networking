@@ -18,6 +18,13 @@ Parameters:
     Description: Do you want to create private subnets in addition to public subnets?
     Type: String
     Default: True
+  NATType:
+    AllowedValues:
+    - "Instance"
+    - "Managed"
+    Description: What type of NAT to use for private instances to communicate with the internet.  A single EC2 instance can be used as a NAT, or you can use the AWS NAT Gateway (managed, scalable, more expensive).  This setting will be IGNORED if you do not build private subnets.
+    Type: String
+    Default: "NAT Gateway"
   
 Metadata:
   
@@ -30,6 +37,8 @@ Conditions: # Conditions are boolean (true/false) expressions that we will use e
   BuildPrivateA: !Equals [ !Ref PrivateSubnets, True ]
   BuildPrivateB: !And [ !Not [ !Equals [ !Ref NumberOfAZs, 1 ] ], !Equals [!Ref PrivateSubnets, True] ]
   BuildPrivateC: !And [ !Equals [ !Ref NumberOfAZs, 3 ] , !Equals [ !Ref PrivateSubnets, True ] ]
+  BuildNATGateway: !And [ !Equals [ !Ref PrivateSubnets, True ], !Equals [ !Ref NATType, "Managed" ] ] 
+  BuildNATInstance: !And [ !Equals [ !Ref PrivateSubnets, True ], !Equals [ !Ref NATType, "Instance"] ]
 
 Resources:
   VPC:
@@ -162,7 +171,7 @@ Resources:
   # A NAT Gateway will be built and used if the user selected Private subnets and a Gateway instead of an EC2 instance. 
   NATGateway:
     Type: AWS::EC2::NatGateway
-    Condition: BuildPrivateSubnets
+    Condition: BuildNATGateway
     Properties:
       AllocationId: !GetAtt ElasticIPAddress.AllocationId
       SubnetId: !Ref PublicSubnetA
@@ -171,7 +180,7 @@ Resources:
         Value: value 
   ElasticIPAddress:
     Type: AWS::EC2::EIP
-    Condition: BuildPrivateSubnets
+    Condition: BuildNATGateway
     Properties:
       Domain: VPC
       PublicIpv4Pool: "String"
