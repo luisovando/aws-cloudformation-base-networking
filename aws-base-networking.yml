@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 # This Cloudformation template deploys VPC
-Description:
+Description: 'AWS CloudFormation Base Network Template: Template showing how to create a network in AWS including VPC, Subnets (Public/Private), Route Tables and associations, also connect private subnets with NAT device. **WARNING** This template creates an NAT Gateway o NAT instance gateway.
+You will be billed for the AWS resources used if you create a stack from this template'
   
 Parameters:
   NumberOfAZs:
