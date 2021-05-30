@@ -25,7 +25,7 @@ Parameters:
     - "Managed"
     Description: What type of NAT to use for private instances to communicate with the internet.  A single EC2 instance can be used as a NAT, or you can use the AWS NAT Gateway (managed, scalable, more expensive).  This setting will be IGNORED if you do not build private subnets.
     Type: String
-    Default: "NAT Gateway"
+    Default: "Managed"
   
 Metadata:
   # Control the UI display when running this template from the AWS Management Console
@@ -297,8 +297,8 @@ Resources:
           ToPort: 65535
           CidrIp: 0.0.0.0/0
       Tags:
-        - Key:
-          Value:
+        - Key: keyname
+          Value: value 
   # A NAT Instance will be used if the user selected Private subnets and EC2-based NAT.     
   NATInstance:
     Type: AWS::EC2::Instance
@@ -335,8 +335,6 @@ Resources:
       ResourceSignal: 
         Count: 1
         Timeout: PT5M      
-Transform:
-  
 Outputs:
   VPC:
     Description: VPC of the base network
