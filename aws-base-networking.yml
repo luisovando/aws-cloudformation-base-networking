@@ -276,7 +276,7 @@ Resources:
       GroupName: !Join [ 
         '-', [ 
           'sg',
-          !FindInMap [ RegionMap, !Ref AWS::Region, 'Shortcode' ],
+          !FindInMap [ RegionMap, !Ref 'AWS::Region', 'Shortcode' ],
           'nat'
         ] 
       ]
